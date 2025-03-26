@@ -36,23 +36,36 @@ resource "aws_internet_gateway" "gw" {
   }
 }
 
-resource "aws_subnet" "Pubsub1" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.1.0/24"
+resource "aws_subnet" "public" {
 
-  tags = {
-    Name = "subnet 1"
-  }
+  count = 3
+
+  vpc_id     = aws_vpc.main.id
+  cidr_block = element(["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"], count.index)
+
+  availability_zone = element(["us-east-1a", "us-east-1b",], count.index)
+
+  # tags = {
+  #   Name = "subnet 1"
+  # }
 }
 
-resource "aws_subnet" "Pubsub2" {
-  vpc_id     = aws_vpc.main.id
-  cidr_block = "10.0.2.0/24"
+resource "aws_subnet" "private" {
 
-  tags = {
-    Name = "subnet 2"
-  }
+  # for_each = toset (["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"])
+  count = 3
+
+  vpc_id     = aws_vpc.main.id
+  cidr_block = element(["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"], count.index)
+
+  availability_zone = element(["us-east-1a", "us-east-1b",], count.index)
+
+
+  # tags = {
+  #   Name = "subnet 1"
+  # }
 }
+
 
 resource "aws_route_table" "pubrt" {
   vpc_id = aws_vpc.main.id
