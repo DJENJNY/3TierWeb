@@ -28,14 +28,6 @@ resource "aws_vpc" "main" {
 }
 
 
-resource "aws_internet_gateway" "gw" {
-  vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name = "main"
-  }
-}
-
 resource "aws_subnet" "public" {
 
   count = 3
@@ -64,6 +56,33 @@ resource "aws_subnet" "private" {
   # tags = {
   #   Name = "subnet 1"
   # }
+}
+
+resource "aws_internet_gateway" "gw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "main"
+  }
+}
+
+resource "aws_eip" "nat_eip" {
+  count = 2
+  domain = "vpc"
+
+  depends_on                = [aws_internet_gateway.gw]
+}
+
+resource "aws_nat_gateway" "ngw" {
+  count = 2
+  allocation_id = aws_eip.nat_eip[count.index].id
+  subnet_id     = element(aws_subnet.public[*].id, count.index)
+
+  tags = {
+    Name = "gw NAT"
+  }
+
+  depends_on = [aws_internet_gateway.gw]
 }
 
 
