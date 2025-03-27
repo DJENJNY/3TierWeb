@@ -44,7 +44,7 @@ resource "aws_subnet" "public" {
 
 resource "aws_subnet" "private" {
 
-  # for_each = toset (["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"])
+  
   count = 3
 
   vpc_id     = aws_vpc.main.id
@@ -98,5 +98,32 @@ resource "aws_route_table" "pubrt" {
     Name = "example"
   }
 }
+
+resource "aws_route_table_association" "public" {
+  count = 2
+  subnet_id      = element(aws_subnet.public[*].id, count.index)
+  route_table_id = aws_route_table.pubrt.id
+}
+
+# resource "aws_route_table" "private" {
+#   vpc_id = aws_vpc.main.id
+
+#   route {
+#     cidr_block = "0.0.0.0/0"
+#     gateway_id = aws_nat_gateway.ngw.id
+#   }
+
+#   tags = {
+#     Name = "example"
+#   }
+# }
+
+# resource "aws_route_table_association" "private" {
+#   count = 2
+
+#   subnet_id      = element(aws_subnet.public[*].id, count.index)
+#   route_table_id = aws_route_table.pubrt.id
+# }
+
 
 
