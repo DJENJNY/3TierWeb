@@ -30,10 +30,10 @@ resource "aws_vpc" "main" {
 
 resource "aws_subnet" "public" {
 
-  count = 3
+  count = 2
 
   vpc_id     = aws_vpc.main.id
-  cidr_block = element(["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"], count.index)
+  cidr_block = element(["10.0.1.0/24", "10.0.2.0/24"], count.index)
 
   availability_zone = element(["us-east-1a", "us-east-1b",], count.index)
 
@@ -45,10 +45,10 @@ resource "aws_subnet" "public" {
 resource "aws_subnet" "private" {
 
   
-  count = 3
+  count = 2
 
   vpc_id     = aws_vpc.main.id
-  cidr_block = element(["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"], count.index)
+  cidr_block = element(["10.0.4.0/24", "10.0.5.0/24"], count.index)
 
   availability_zone = element(["us-east-1a", "us-east-1b",], count.index)
 
@@ -105,25 +105,29 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.pubrt.id
 }
 
-# resource "aws_route_table" "private" {
-#   vpc_id = aws_vpc.main.id
+resource "aws_route_table" "private" {
+  count                     = 2
+  
+  vpc_id                    = aws_vpc.main.id
 
-#   route {
-#     cidr_block = "0.0.0.0/0"
-#     gateway_id = aws_nat_gateway.ngw.id
-#   }
+  route {
+    cidr_block              = "0.0.0.0/0"
+    nat_gateway_id          = aws_nat_gateway.ngw[count.index].id
+  }
 
-#   tags = {
-#     Name = "example"
-#   }
-# }
+  tags = {
+    Name = "private-rtable-${count.index+1}"
+  }
+}
 
-# resource "aws_route_table_association" "private" {
-#   count = 2
+resource "aws_route_table_association" "private" {
+  count                     = 2
+  subnet_id                 = element(aws_subnet.private.*.id, count.index)
+  route_table_id            = element(aws_route_table.private.*.id, count.index)
+}
+  
 
-#   subnet_id      = element(aws_subnet.public[*].id, count.index)
-#   route_table_id = aws_route_table.pubrt.id
-# }
+ 
 
 
 
