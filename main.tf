@@ -5,8 +5,7 @@ terraform {
     region = "us-east-1"
   }
 
-
-  required_providers {
+required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
@@ -27,7 +26,6 @@ resource "aws_vpc" "main" {
   }
 }
 
-
 resource "aws_subnet" "public" {
 
   count = 2
@@ -37,9 +35,9 @@ resource "aws_subnet" "public" {
 
   availability_zone = element(["us-east-1a", "us-east-1b", ], count.index)
 
-  # tags = {
-  #   Name = "subnet 1"
-  # }
+  tags = {
+    Name = "subnet-${count.index + 1}"
+  }
 }
 
 resource "aws_subnet" "private" {
@@ -53,9 +51,9 @@ resource "aws_subnet" "private" {
   availability_zone = element(["us-east-1a", "us-east-1b", ], count.index)
 
 
-  # tags = {
-  #   Name = "subnet 1"
-  # }
+  tags = {
+    Name = "subnet-${count.index + 1}"
+  }
 }
 
 resource "aws_internet_gateway" "gw" {
@@ -79,7 +77,7 @@ resource "aws_nat_gateway" "ngw" {
   subnet_id     = element(aws_subnet.public[*].id, count.index)
 
   tags = {
-    Name = "gw NAT"
+    Name = "gw-NAT-${count.index + 1}"
   }
 
   depends_on = [aws_internet_gateway.gw]
@@ -94,7 +92,7 @@ resource "aws_route_table" "pubrt" {
   }
 
   tags = {
-    Name = "example"
+    Name = "public route table"
   }
 }
 
@@ -115,14 +113,8 @@ resource "aws_route_table" "private" {
   }
 
   tags = {
-    Name = "private-rtable-${count.index + 1}"
+    Name = "private-rtable-${count.index +1}"
   }
-}
-
-resource "aws_route_table_association" "private" {
-  count          = 2
-  subnet_id      = element(aws_subnet.private.*.id, count.index)
-  route_table_id = element(aws_route_table.private.*.id, count.index)
 }
 
 resource "aws_security_group" "allow_tls" {
@@ -137,10 +129,24 @@ resource "aws_security_group" "allow_tls" {
 
 resource "aws_vpc_security_group_ingress_rule" "allow_tls_ipv4" {
   security_group_id = aws_security_group.allow_tls.id
-  cidr_ipv4         = aws_vpc.main.cidr_block
+  cidr_ipv4         = "0.0.0.0/0"
   from_port         = 443
   ip_protocol       = "tcp"
   to_port           = 443
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_tls_ssh" {
+  security_group_id = aws_security_group.allow_tls.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  ip_protocol       = "tcp"
+  to_port           = 22
+}
+
+resource "aws_route_table_association" "private" {
+  count          = 2
+  subnet_id      = element(aws_subnet.private.*.id, count.index)
+  route_table_id = element(aws_route_table.private.*.id, count.index)
 }
 
 resource "aws_security_group" "external_lb" {
@@ -155,10 +161,11 @@ resource "aws_security_group" "external_lb" {
 
 resource "aws_vpc_security_group_ingress_rule" "external_lb" {
   security_group_id = aws_security_group.external_lb.id
-  cidr_ipv4         = aws_vpc.main.cidr_block
-  from_port         = 80
-  ip_protocol       = "tcp"
-  to_port           = 80
+
+  cidr_ipv4   = "0.0.0.0/0"
+  from_port   = 80
+  ip_protocol = "tcp"
+  to_port     = 80
 }
 
 resource "aws_security_group" "web_tier" {
@@ -173,16 +180,16 @@ resource "aws_security_group" "web_tier" {
 
 resource "aws_vpc_security_group_ingress_rule" "web_tier" {
   security_group_id = aws_security_group.web_tier.id
-  cidr_ipv4         = aws_vpc.main.cidr_block
+  cidr_ipv4         = "0.0.0.0/0"
   from_port         = 80
   ip_protocol       = "tcp"
   to_port           = 80
 }
 
 resource "aws_security_group_rule" "lb_to_instance" {
-  type                     = "ingress" # Or "egress"
+  type                     = "ingress"                      # Or "egress"
   security_group_id        = aws_security_group.web_tier.id # The security group to apply the rule to
-  from_port                = 80 # Replace with the port you want to allow
+  from_port                = 80                             # Replace with the port you want to allow
   to_port                  = 80
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.external_lb.id # The security group to allow traffic from
@@ -199,9 +206,9 @@ resource "aws_security_group" "internal_lb" {
 }
 
 resource "aws_security_group_rule" "allow_web_to_lb" {
-  type                     = "ingress" # Or "egress"
+  type                     = "ingress"                         # Or "egress"
   security_group_id        = aws_security_group.internal_lb.id # The security group to apply the rule to
-  from_port                = 80 # Replace with the port you want to allow
+  from_port                = 80                                # Replace with the port you want to allow
   to_port                  = 80
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.web_tier.id # The security group to allow traffic from
@@ -218,9 +225,9 @@ resource "aws_security_group" "private_instances" {
 }
 
 resource "aws_security_group_rule" "allow_lb_to_private_instance" {
-  type                     = "ingress" # Or "egress"
+  type                     = "ingress"                               # Or "egress"
   security_group_id        = aws_security_group.private_instances.id # The security group to apply the rule to
-  from_port                = 4000 # Replace with the port you want to allow
+  from_port                = 4000                                    # Replace with the port you want to allow
   to_port                  = 4000
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.internal_lb.id # The security group to allow traffic from
@@ -228,7 +235,7 @@ resource "aws_security_group_rule" "allow_lb_to_private_instance" {
 
 resource "aws_vpc_security_group_ingress_rule" "private_instance" {
   security_group_id = aws_security_group.private_instances.id
-  cidr_ipv4         = aws_vpc.main.cidr_block
+  cidr_ipv4         = "0.0.0.0/0"
   from_port         = 4000
   ip_protocol       = "tcp"
   to_port           = 4000
@@ -245,13 +252,32 @@ resource "aws_security_group" "database" {
 }
 
 resource "aws_security_group_rule" "database" {
-  type                     = "ingress" # Or "egress"
+  type                     = "ingress"                      # Or "egress"
   security_group_id        = aws_security_group.database.id # The security group to apply the rule to
-  from_port                = 3306# Replace with the port you want to allow
+  from_port                = 3306                           # Replace with the port you want to allow
   to_port                  = 3306
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.private_instances.id # The security group to allow traffic from
 }
+
+resource "aws_instance" "app_tier" {
+  count = 2
+  ami                         = "ami-071226ecf16aa7d96" # Replace with your desired AMI ID
+  instance_type               = "t2.micro" # Or your desired instance type
+  key_name                    = "EC2 Tutorial" # Replace with your key pair name
+  vpc_security_group_ids      = [aws_security_group.allow_tls.id] # Replace with your security group ID
+  subnet_id                   = element(aws_subnet.public.*.id, count.index) # Replace with your subnet ID
+  tags = {
+    Name = "app_instance" # Optional: Add tags for easier identification
+  }
+}
+
+output "instance_public_ip" {
+  value = aws_instance.app_tier[*].public_ip
+}
+
+
+
 
 
 
