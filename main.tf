@@ -261,12 +261,13 @@ resource "aws_security_group_rule" "database" {
 }
 
 resource "aws_instance" "app_tier" {
-  count = 2
+  count = 1
   ami                         = "ami-071226ecf16aa7d96" # Replace with your desired AMI ID
   instance_type               = "t2.micro" # Or your desired instance type
   key_name                    = "EC2 Tutorial" # Replace with your key pair name
   vpc_security_group_ids      = [aws_security_group.allow_tls.id] # Replace with your security group ID
-  subnet_id                   = element(aws_subnet.public.*.id, count.index) # Replace with your subnet ID
+  subnet_id                   = element(aws_subnet.public.*.id, count.index)
+  associate_public_ip_address = true # Replace with your subnet ID
   tags = {
     Name = "app_instance" # Optional: Add tags for easier identification
   }
