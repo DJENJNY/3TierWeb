@@ -5,7 +5,7 @@ terraform {
     region = "us-east-1"
   }
 
-required_providers {
+  required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
@@ -18,7 +18,7 @@ provider "aws" {
 }
 
 resource "aws_iam_role" "ec2_role" {
-  name = "ec2_instance_role"
+  name = "ec2_role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -34,16 +34,22 @@ resource "aws_iam_role" "ec2_role" {
 }
 
 resource "aws_iam_role_policy_attachment" "s3_read_only_policy" {
-  
-  role      = aws_iam_role.ec2_role.name
+
+  role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess" # Example policy
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonSSM_Managed_Instance_Core" {
-  
-  role      = aws_iam_role.ec2_role.name
+
+  role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore" # Example policy
 }
+
+resource "aws_iam_instance_profile" "my_ec2_profile" {
+  name = "my-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+}
+
 
 # Create a VPC
 resource "aws_vpc" "main" {
@@ -69,7 +75,6 @@ resource "aws_subnet" "public" {
 }
 
 resource "aws_subnet" "private" {
-
 
   count = 2
 
@@ -111,7 +116,7 @@ resource "aws_nat_gateway" "ngw" {
   depends_on = [aws_internet_gateway.gw]
 }
 
-resource "aws_route_table" "pubrt" {
+resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
 
   route {
@@ -127,7 +132,7 @@ resource "aws_route_table" "pubrt" {
 resource "aws_route_table_association" "public" {
   count          = 2
   subnet_id      = element(aws_subnet.public[*].id, count.index)
-  route_table_id = aws_route_table.pubrt.id
+  route_table_id = aws_route_table.public.id
 }
 
 resource "aws_route_table" "private" {
@@ -141,40 +146,40 @@ resource "aws_route_table" "private" {
   }
 
   tags = {
-    Name = "private-rtable-${count.index +1}"
+    Name = "private-rtable-${count.index + 1}"
   }
-}
-
-resource "aws_security_group" "allow_tls" {
-  name        = "allow_tls"
-  description = "Allow TLS inbound traffic and all outbound traffic"
-  vpc_id      = aws_vpc.main.id
-
-  tags = {
-    Name = "allow_tls"
-  }
-}
-
-resource "aws_vpc_security_group_ingress_rule" "allow_tls_ipv4" {
-  security_group_id = aws_security_group.allow_tls.id
-  cidr_ipv4         = "0.0.0.0/0"
-  from_port         = 443
-  ip_protocol       = "tcp"
-  to_port           = 443
-}
-
-resource "aws_vpc_security_group_ingress_rule" "allow_tls_ssh" {
-  security_group_id = aws_security_group.allow_tls.id
-  cidr_ipv4         = "0.0.0.0/0"
-  from_port         = 22
-  ip_protocol       = "tcp"
-  to_port           = 22
 }
 
 resource "aws_route_table_association" "private" {
   count          = 2
   subnet_id      = element(aws_subnet.private.*.id, count.index)
   route_table_id = element(aws_route_table.private.*.id, count.index)
+}
+
+resource "aws_security_group" "ec2" {
+  name        = "ec2"
+  description = "Allow TLS inbound traffic and all outbound traffic"
+  vpc_id      = aws_vpc.main.id
+
+  tags = {
+    Name = "ec2"
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_tls_ssh" {
+  security_group_id = aws_security_group.ec2.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  ip_protocol       = "tcp"
+  to_port           = 22
+}
+
+resource "aws_vpc_security_group_ingress_rule" "allow_tls_http" {
+  security_group_id = aws_security_group.ec2.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 80
+  ip_protocol       = "tcp"
+  to_port           = 80
 }
 
 resource "aws_security_group" "external_lb" {
@@ -269,6 +274,33 @@ resource "aws_vpc_security_group_ingress_rule" "private_instance" {
   to_port           = 4000
 }
 
+resource "aws_vpc_security_group_ingress_rule" "private_instance_ssh" {
+  security_group_id = aws_security_group.private_instances.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 22
+  ip_protocol       = "tcp"
+  to_port           = 22
+}
+
+resource "aws_vpc_security_group_ingress_rule" "private_instance_http" {
+  security_group_id = aws_security_group.private_instances.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 80
+  ip_protocol       = "tcp"
+  to_port           = 80
+}
+
+    resource "aws_security_group_rule" "outbound_rule" {
+      type                     = "egress"
+      security_group_id        = aws_security_group.private_instances.id # Use the security group ID
+      from_port                = 80 # Or your desired port
+      to_port                  = 80 # Or your desired port
+      protocol                 = "tcp" # Or your desired protocol
+      cidr_blocks              = ["0.0.0.0/0"] # Or your desired CIDR block
+      # OR
+      # referenced_security_group_id = aws_security_group.other_sg.id # If allowing traffic to another SG
+    }
+
 resource "aws_security_group" "database" {
   name        = "database"
   description = "database"
@@ -289,11 +321,12 @@ resource "aws_security_group_rule" "database" {
 }
 
 resource "aws_instance" "app_tier" {
-  count = 1
-  ami                         = "ami-071226ecf16aa7d96" # Replace with your desired AMI ID
-  instance_type               = "t2.micro" # Or your desired instance type
-  key_name                    = "EC2 Tutorial" # Replace with your key pair name
-  vpc_security_group_ids      = [aws_security_group.allow_tls.id] # Replace with your security group ID
+  count                       = 1
+  ami                         = "ami-0a9a48ce4458e384e" # Replace with your desired AMI ID
+  instance_type               = "t2.micro"              # Or your desired instance type
+  key_name                    = "EC2 Tutorial"          # Replace with your key pair name
+  iam_instance_profile        = aws_iam_instance_profile.my_ec2_profile.name
+  vpc_security_group_ids      = [aws_security_group.private_instances.id] # Replace with your security group ID
   subnet_id                   = element(aws_subnet.public.*.id, count.index)
   associate_public_ip_address = true # Replace with your subnet ID
   tags = {
