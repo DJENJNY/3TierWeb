@@ -174,6 +174,14 @@ resource "aws_vpc_security_group_ingress_rule" "allow_tls_ssh" {
   to_port           = 22
 }
 
+resource "aws_vpc_security_group_ingress_rule" "allow_ec2" {
+  security_group_id = aws_security_group.ec2.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 8080
+  ip_protocol       = "tcp"
+  to_port           = 8080
+}
+
 resource "aws_vpc_security_group_ingress_rule" "allow_tls_http" {
   security_group_id = aws_security_group.ec2.id
   cidr_ipv4         = "0.0.0.0/0"
@@ -348,7 +356,7 @@ resource "aws_instance" "app_tier" {
   subnet_id                   = element(aws_subnet.public.*.id, count.index)
   associate_public_ip_address = true # Replace with your subnet ID
 
-  user_data = file("/Users/dj-enj/documents/workspace/3TierWeb/firstscript.sh")
+  user_data = file("${path.module}/firstscript.sh")
   tags = {
     Name = "app_instance" # Optional: Add tags for easier identification
   }

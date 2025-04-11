@@ -1,25 +1,26 @@
 #!/bin/bash
+set -e  # Stop on errors
+
 echo "Starting bootstrap process"
 
-# Add Docker's official GPG key:
-sudo yum update
-sudo yum install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+# Update and install Docker
+sudo yum update -y
+sudo yum install -y docker
 
-# Add the repository to Apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo yum update
+# Start and enable Docker
+sudo systemctl start docker
+sudo systemctl enable docker
 
-sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+# Pull and run Nginx container
+sudo docker pull nginx
 
-docker pull nginx
+# Remove existing container if it exists
+if [ "$(sudo docker ps -aq -f name=nginx-container)" ]; then
+  sudo docker rm -f nginx-container
+fi
 
-docker run --name nginx-container -p 8080:80 -d nginx
+# Run new container
+sudo docker run --name nginx-container -p 8080:80 -d nginx
 
+echo "Bootstrap completed"
 
-echo "bootstrap completed"
