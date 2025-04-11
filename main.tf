@@ -182,6 +182,24 @@ resource "aws_vpc_security_group_ingress_rule" "allow_tls_http" {
   to_port           = 80
 }
 
+resource "aws_vpc_security_group_ingress_rule" "allow_ping" {
+  security_group_id = aws_security_group.ec2.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = -1
+  ip_protocol       = "icmp"
+  to_port           = -1
+}
+
+resource "aws_vpc_security_group_egress_rule" "allow_https" {
+  security_group_id = aws_security_group.ec2.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 443
+  ip_protocol       = "tcp"
+  to_port           = 443
+}
+
+
+
 resource "aws_security_group" "external_lb" {
   name        = "external_lb"
   description = "External Load balancer security group"
@@ -326,9 +344,11 @@ resource "aws_instance" "app_tier" {
   instance_type               = "t2.micro"              # Or your desired instance type
   key_name                    = "EC2 Tutorial"          # Replace with your key pair name
   iam_instance_profile        = aws_iam_instance_profile.my_ec2_profile.name
-  vpc_security_group_ids      = [aws_security_group.private_instances.id] # Replace with your security group ID
+  vpc_security_group_ids      = [aws_security_group.ec2.id] # Replace with your security group ID
   subnet_id                   = element(aws_subnet.public.*.id, count.index)
   associate_public_ip_address = true # Replace with your subnet ID
+
+  user_data = file("/Users/dj-enj/documents/workspace/3TierWeb/firstscript.sh")
   tags = {
     Name = "app_instance" # Optional: Add tags for easier identification
   }
