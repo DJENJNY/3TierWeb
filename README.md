@@ -60,7 +60,7 @@ http://<public_ip>:8080
 ```
 You should see the NGINX welcome page served from inside the Docker container.
 
-![Image showing output of program](/3TierWeb/screenshots/Screenshot%202025-04-15%20at%2011.05.05%20AM.png)
+![Image showing output of program](./screenshots/Ngnix-browser.png)
 ---
 
 ## 🧹 Destroying the Infrastructure
